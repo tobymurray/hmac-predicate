@@ -6,10 +6,10 @@ license = "GPL-3.0-or-later"
 description = "Tower predicate HMAC verification of query params"
 
 [dependencies]
-form_urlencoded = "*"
-hex = "*"
-hmac = "*"
-http = "*"
-sha2 = "*"
-thiserror = "*"
-tower = { version = "*", features = ["filter"] }
+form_urlencoded = ">= 1"
+hex = ">= 0"
+hmac = ">= 0"
+http = ">= 0"
+sha2 = ">= 0"
+thiserror = ">= 1"
+tower = { version = ">= 0", features = ["filter"] }
