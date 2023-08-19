@@ -1,8 +1,5 @@
 use hex::FromHexError;
-use hmac::{
-	digest::{InvalidLength, MacError},
-	Hmac, Mac,
-};
+use hmac::{digest::InvalidLength, Hmac, Mac};
 use http::Request;
 use sha2::Sha256;
 use thiserror::Error;
@@ -24,8 +21,8 @@ pub enum HmacQueryParamError {
 	HashKeyNotSet { error: InvalidLength },
 	#[error("Failed decoding HMAC as hex string: {error:#?}")]
 	HexDecodingError { error: FromHexError },
-	#[error("Computed hash did not match provided hash: {error:#?}")]
-	HashVerificationFailed { error: MacError },
+	#[error("Computed hash did not match provided hash")]
+	HashVerificationFailed,
 }
 
 impl<T> Predicate<Request<T>> for HmacQueryParamValidator {
@@ -66,7 +63,7 @@ impl<T> Predicate<Request<T>> for HmacQueryParamValidator {
 		// 7. Compare the Shopify-provided value to the freshly computed value
 		hasher
 			.verify(hmac_bytes.as_slice().into())
-			.map_err(|e| HmacQueryParamError::HashVerificationFailed { error: e })?;
+			.map_err(|_| HmacQueryParamError::HashVerificationFailed)?;
 
 		Ok(request)
 	}
