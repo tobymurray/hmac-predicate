@@ -1,4 +1,8 @@
-use hmac::{Hmac, Mac};
+use hex::FromHexError;
+use hmac::{
+	digest::{InvalidLength, MacError},
+	Hmac, Mac,
+};
 use http::Request;
 use sha2::Sha256;
 use thiserror::Error;
@@ -14,14 +18,14 @@ pub struct HmacQueryParamValidator {
 pub enum HmacQueryParamError {
 	#[error("Request did not have a query string")]
 	NoQueryString,
-	#[error("Request did not have an HMAC query param")]
-	QueryStringButNoHmac,
-	#[error("Hash key not appropriately set")]
-	HashKeyNotSet,
-	#[error("Failed decoding HMAC as hex string")]
-	HexDecodingError,
-	#[error("Computed hash did not match provided hash")]
-	HashVerificationFailed,
+	#[error("Request did not have an HMAC query param: {query_string}")]
+	QueryStringButNoHmac { query_string: String },
+	#[error("Hash key not appropriately set: {error:#?}")]
+	HashKeyNotSet { error: InvalidLength },
+	#[error("Failed decoding HMAC as hex string: {error:#?}")]
+	HexDecodingError { error: FromHexError },
+	#[error("Computed hash did not match provided hash: {error:#?}")]
+	HashVerificationFailed { error: MacError },
 }
 
 impl<T> Predicate<Request<T>> for HmacQueryParamValidator {
@@ -33,7 +37,12 @@ impl<T> Predicate<Request<T>> for HmacQueryParamValidator {
 		// 2. Grab the hmac query parameter (both key and value), separate from the rest of the query params
 		let (hmac, params): (Vec<_>, Vec<_>) =
 			form_urlencoded::parse(query.as_bytes()).partition(|(key, _)| key == "hmac");
-		let hmac = &hmac.first().ok_or(HmacQueryParamError::QueryStringButNoHmac)?.1;
+		let hmac = &hmac
+			.first()
+			.ok_or(HmacQueryParamError::QueryStringButNoHmac {
+				query_string: query.to_string(),
+			})?
+			.1;
 
 		// 3. Rebuild the query string without the hmac, as it's excluded from the hash
 		let query_string_without_hmac = form_urlencoded::Serializer::new(String::new())
@@ -41,8 +50,8 @@ impl<T> Predicate<Request<T>> for HmacQueryParamValidator {
 			.finish();
 
 		// 4. Create a HMAC SHA256 hash function using key as the hash key
-		let mut hasher =
-			Hmac::<Sha256>::new_from_slice(self.key.as_bytes()).map_err(|_| HmacQueryParamError::HashKeyNotSet)?;
+		let mut hasher = Hmac::<Sha256>::new_from_slice(self.key.as_bytes())
+			.map_err(|e| HmacQueryParamError::HashKeyNotSet { error: e })?;
 
 		// 5. Hash the remnants of the query string (with hmac removed)
 		hasher.update(&query_string_without_hmac.into_bytes());
@@ -51,12 +60,13 @@ impl<T> Predicate<Request<T>> for HmacQueryParamValidator {
 		// as a string. I say that slighly weirdly because you can't just compare the value to the computed hash, the
 		// string needs to be decoded as hexadecimal (e.g. the characters '02' are the numerical value 2). At that
 		// point the resultant "number" can be compared with the output of the hash function
-		let hmac_bytes = hex::decode(hmac.as_bytes()).map_err(|_| HmacQueryParamError::HexDecodingError)?;
+		let hmac_bytes =
+			hex::decode(hmac.as_bytes()).map_err(|e| HmacQueryParamError::HexDecodingError { error: e })?;
 
 		// 7. Compare the Shopify-provided value to the freshly computed value
 		hasher
 			.verify(hmac_bytes.as_slice().into())
-			.map_err(|_| HmacQueryParamError::HashVerificationFailed)?;
+			.map_err(|e| HmacQueryParamError::HashVerificationFailed { error: e })?;
 
 		Ok(request)
 	}
