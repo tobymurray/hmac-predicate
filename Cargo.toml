@@ -1,9 +1,11 @@
 [package]
 name = "hmac-predicate"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2021"
 license = "GPL-3.0-or-later"
 description = "Tower predicate HMAC verification of query params"
+homepage = "https://github.com/tobymurray/hmac-predicate"
+repository = "https://github.com/tobymurray/hmac-predicate"
 
 [dependencies]
 form_urlencoded = ">= 1"
