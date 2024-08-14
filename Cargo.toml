@@ -15,3 +15,5 @@ http = ">= 0"
 sha2 = ">= 0"
 thiserror = ">= 1"
 tower = { version = ">= 0", features = ["filter"] }
+http-body = ">= 0"
+bytes = ">= 0"
